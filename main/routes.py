@@ -1,30 +1,16 @@
 from main import app, db, pass_generator
-from flask import render_template, url_for, redirect, flash, request
-from main.forms import Register, Login, UpdateAccount
-from main.models import UsersTable
+from flask import render_template, url_for, redirect, flash, request, abort
+from main.forms import Register, Login, UpdateAccount, NewPost
+from main.models import UsersTable, PostsTable
 from flask_login import login_user, current_user, logout_user, login_required
 import secrets
 import os
-
-posts = [
-    {
-        'author': 'Corey Schafer',
-        'title': 'Blog Post 1',
-        'content': 'First post content',
-        'date_posted': 'April 20, 2018'
-    },
-    {
-        'author': 'Jane Doe',
-        'title': 'Blog Post 2',
-        'content': 'Second post content',
-        'date_posted': 'April 21, 2018'
-    }
-]
 
 
 @app.route('/')
 @app.route('/home')
 def home():
+    posts = PostsTable.query.all()
     return render_template('home.html', posts=posts)
 
 
@@ -98,3 +84,53 @@ def account():
 def logout():
     logout_user()
     return redirect(url_for('login'))
+
+
+@app.route('/new/post', methods=['GET','POST'])
+def new_post():
+    form = NewPost()
+    if form.validate_on_submit():
+        the_post = PostsTable(title=form.title.data, content=form.content.data, author=current_user)
+        db.session.add(the_post)
+        db.session.commit()
+        flash('Post created successfully', 'success')
+        return redirect(url_for('new_post'))
+    return render_template('new-post.html', title='New Post', form=form, legend='New Post')
+
+
+@app.route('/post/<int:post_id>')
+def post(post_id):
+    the_post = PostsTable.query.get_or_404(post_id)
+    return render_template('post.html', post=the_post, title=the_post.title)
+
+
+@app.route('/post/<int:post_id>/update', methods=['GET','POST'])
+@login_required
+def update_post(post_id):
+    the_post = PostsTable.query.get_or_404(post_id)
+    if current_user.email != the_post.author.email:
+        abort(403)
+    form = NewPost()
+    if form.validate_on_submit():
+        the_post.title = form.title.data
+        the_post.content = form.content.data
+        db.session.commit()
+        flash('Post updated successfully', 'success')
+        return redirect(url_for('home'))
+    elif request.method == 'GET':
+        form.title.data = the_post.title
+        form.content.data = the_post.content
+    return render_template('new-post.html', title=the_post.title, form=form, legend='Update Post')
+
+
+@app.route('/post/<int:post_id>/delete', methods=['POST'])
+@login_required
+def delete_post(post_id):
+    the_post = PostsTable.query.get(post_id)
+    if current_user.email != the_post.author.email:
+        abort(403)
+    db.session.delete(the_post)
+    db.session.commit()
+    return redirect(url_for('home'))
+
+

@@ -1,6 +1,6 @@
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileAllowed
-from wtforms import StringField, PasswordField, BooleanField, SubmitField
+from wtforms import StringField, PasswordField, BooleanField, SubmitField, TextAreaField
 from wtforms.validators import Email, Length, DataRequired, EqualTo, ValidationError
 from main.models import UsersTable
 from flask_login import current_user
@@ -55,3 +55,10 @@ class UpdateAccount(FlaskForm):
             user = UsersTable.query.filter_by(username=email.data).first()
             if user:
                 raise ValidationError('Sorry, email already exists. Try another one!')
+
+
+class NewPost(FlaskForm):
+    '''This is a class that creates a new post'''
+    title = StringField('Post Title', validators=[DataRequired()])
+    content = TextAreaField('Post Content', validators=[DataRequired()])
+    submit = SubmitField('Submit Post')
