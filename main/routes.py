@@ -10,7 +10,8 @@ import os
 @app.route('/')
 @app.route('/home')
 def home():
-    posts = PostsTable.query.all()
+    page_num = request.args.get('page', 1, type=int)
+    posts = PostsTable.query.order_by(PostsTable.id.desc()).paginate(per_page=5, page=page_num)
     return render_template('home.html', posts=posts)
 
 
@@ -57,7 +58,6 @@ def save_profile_picture(picture):
     picture.save(picture_path)
 
     return image_name
-
 
 
 @app.route('/account', methods=['POST','GET'])
@@ -132,5 +132,13 @@ def delete_post(post_id):
     db.session.delete(the_post)
     db.session.commit()
     return redirect(url_for('home'))
+
+
+@app.route('/posts/<string:username>')
+def users_posts(username):
+    page = request.args.get('page', 1, type=int)
+    user = UsersTable.query.filter_by(username=username).first_or_404()
+    the_posts = PostsTable.query.filter_by(author=user).paginate(page=page, per_page=5)
+    return render_template('users-posts.html', title='Posts', posts=the_posts, user=user)
 
 
