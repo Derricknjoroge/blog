@@ -1,17 +1,18 @@
-from main import app, db, pass_generator
+from main import app, db, pass_generator, mail
 from flask import render_template, url_for, redirect, flash, request, abort
-from main.forms import Register, Login, UpdateAccount, NewPost
+from main.forms import Register, Login, UpdateAccount, NewPost, ResetRequest, ResetPassword
 from main.models import UsersTable, PostsTable
 from flask_login import login_user, current_user, logout_user, login_required
 import secrets
 import os
+from flask_mail import Message
 
 
 @app.route('/')
 @app.route('/home')
 def home():
-    page_num = request.args.get('page', 1, type=int)
-    posts = PostsTable.query.order_by(PostsTable.id.desc()).paginate(per_page=5, page=page_num)
+    page = request.args.get('page', 1, type=int)
+    posts = PostsTable.query.order_by(PostsTable.id.desc()).paginate(per_page=2, page=page)
     return render_template('home.html', posts=posts)
 
 
@@ -20,7 +21,7 @@ def about():
     return render_template('about.html', title='About')
 
 
-@app.route('/login', methods=['POST','GET'])
+@app.route('/login', methods=['POST', 'GET'])
 def login():
     form = Login()
     if form.validate_on_submit():
@@ -35,7 +36,7 @@ def login():
     return render_template('login.html', form=form)
 
 
-@app.route('/register', methods=['POST','GET'])
+@app.route('/register', methods=['POST', 'GET'])
 def register():
     if current_user.is_authenticated:
         return redirect(url_for('home'))
@@ -45,7 +46,7 @@ def register():
         user = UsersTable(username=form.username.data, email=form.email.data, password=hashed_password)
         db.session.add(user)
         db.session.commit()
-        flash('Created account. Please login','success')
+        flash('Created account. Please login', 'success')
         return redirect(url_for('login'))
     return render_template('register.html', form=form)
 
@@ -60,7 +61,7 @@ def save_profile_picture(picture):
     return image_name
 
 
-@app.route('/account', methods=['POST','GET'])
+@app.route('/account', methods=['POST', 'GET'])
 @login_required
 def account():
     profile_image = url_for('static', filename=f'profile_pics/{current_user.image_file}')
@@ -86,7 +87,7 @@ def logout():
     return redirect(url_for('login'))
 
 
-@app.route('/new/post', methods=['GET','POST'])
+@app.route('/new/post', methods=['GET', 'POST'])
 def new_post():
     form = NewPost()
     if form.validate_on_submit():
@@ -104,7 +105,7 @@ def post(post_id):
     return render_template('post.html', post=the_post, title=the_post.title)
 
 
-@app.route('/post/<int:post_id>/update', methods=['GET','POST'])
+@app.route('/post/<int:post_id>/update', methods=['GET', 'POST'])
 @login_required
 def update_post(post_id):
     the_post = PostsTable.query.get_or_404(post_id)
@@ -135,10 +136,49 @@ def delete_post(post_id):
 
 
 @app.route('/posts/<string:username>')
-def users_posts(username):
+def user_posts(username):
     page = request.args.get('page', 1, type=int)
     user = UsersTable.query.filter_by(username=username).first_or_404()
-    the_posts = PostsTable.query.filter_by(author=user).paginate(page=page, per_page=5)
-    return render_template('users-posts.html', title='Posts', posts=the_posts, user=user)
+    posts = PostsTable.query.filter_by(author=user).paginate(page=page, per_page=2)
+    return render_template('users-posts.html', posts=posts, user=user)
 
 
+def send_reset_email(user):
+    token = user.create_reset_token()
+    msg = Message('Password Change', sender='noreply@demo.com', recipients=[user.email])
+    msg.body = f'''To reset your password, follow this link:
+        {url_for('reset_password', token=token, _external=True)}
+        
+        Ignore if you did not initiate the request.'''
+    mail.send(msg)
+
+
+@app.route('/reset-request', methods=['GET', 'POST'])
+def reset_request():
+    if current_user.is_authenticated:
+        return redirect(url_for('home'))
+    form = ResetRequest()
+    if form.validate_on_submit():
+        user = UsersTable.query.filter_by(email=form.email.data).first()
+        send_reset_email(user)
+        flash('Check your email for a reset link', 'success')
+        return redirect(url_for('login'))
+    return render_template('reset-request.html', title='Reset Password', form=form)
+
+
+@app.route('/reset-request/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    if current_user.is_authenticated:
+        return redirect(url_for('home'))
+    user = UsersTable.verify_reset_token(token)
+    if user is None:
+        flash('Token is expired or invalid. Retry again.', 'danger')
+        return redirect(url_for('reset_request'))
+    form = ResetPassword()
+    if form.validate_on_submit():
+        hashed_password = pass_generator.generate_password_hash(form.password.data).decode('utf-8')
+        user.password = hashed_password
+        db.session.commit()
+        flash('Your password has been updated! You are now able to log in', 'success')
+        return redirect(url_for('login'))
+    return render_template('reset-password.html', title='Reset Password', form=form)

@@ -22,7 +22,7 @@ class Register(FlaskForm):
 
     def validate_email(self, email):
         '''Method to validated field from the database'''
-        user = UsersTable.query.filter_by(username=email.data).first()
+        user = UsersTable.query.filter_by(email=email.data).first()
         if user:
             raise ValidationError('Sorry, email already exists. Try another one!')
 
@@ -52,7 +52,7 @@ class UpdateAccount(FlaskForm):
     def validate_email(self, email):
         '''Method to validated field from the database'''
         if current_user.email != email.data:
-            user = UsersTable.query.filter_by(username=email.data).first()
+            user = UsersTable.query.filter_by(email=email.data).first()
             if user:
                 raise ValidationError('Sorry, email already exists. Try another one!')
 
@@ -62,3 +62,21 @@ class NewPost(FlaskForm):
     title = StringField('Post Title', validators=[DataRequired()])
     content = TextAreaField('Post Content', validators=[DataRequired()])
     submit = SubmitField('Submit Post')
+
+
+class ResetRequest(FlaskForm):
+    '''This is a class that creates the reset request form'''
+    email = StringField('Email', validators=[Email(), DataRequired()])
+    submit = SubmitField('Request')
+
+    def validate_email(self, email):
+        user = UsersTable.query.filter_by(email=email.data).first()
+        if user is None:
+            raise ValidationError('Sorry, this email has not been registered!')
+
+
+class ResetPassword(FlaskForm):
+    '''This is a form that creates the reset password form'''
+    password = PasswordField('Password', validators=[DataRequired(), Length(min=4, max=20)])
+    confirm_password = PasswordField('Confirm Password', validators=[DataRequired(), EqualTo('password')])
+    submit = SubmitField('Reset Password')
