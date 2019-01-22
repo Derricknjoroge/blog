@@ -57,13 +57,6 @@ class UpdateAccount(FlaskForm):
                 raise ValidationError('Sorry, email already exists. Try another one!')
 
 
-class NewPost(FlaskForm):
-    '''This is a class that creates a new post'''
-    title = StringField('Post Title', validators=[DataRequired()])
-    content = TextAreaField('Post Content', validators=[DataRequired()])
-    submit = SubmitField('Submit Post')
-
-
 class ResetRequest(FlaskForm):
     '''This is a class that creates the reset request form'''
     email = StringField('Email', validators=[Email(), DataRequired()])

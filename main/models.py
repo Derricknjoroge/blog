@@ -1,4 +1,5 @@
-from main import db, login_manager, app
+from main import db, login_manager
+from flask import current_app
 from datetime import datetime
 from flask_login import UserMixin
 from itsdangerous import TimedJSONWebSignatureSerializer as Serializer
@@ -20,13 +21,13 @@ class UsersTable(db.Model, UserMixin):
 
     def create_reset_token(self, expires_time=1800):
         '''This is a method for creating a token'''
-        s = Serializer(app.config['SECRET_KEY'], expires_time)
+        s = Serializer(current_app.config['SECRET_KEY'], expires_time)
         return s.dumps({'user_id':self.id})
 
     @staticmethod
     def verify_reset_token(token):
         '''This is a method for verifing a token'''
-        s = Serializer(app.config['SECRET_KEY'])
+        s = Serializer(current_app.config['SECRET_KEY'])
         try:
             user_id = s.loads(token)['user_id']
         except:
